@@ -32,47 +32,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  async function ensureOrganization(currentUser: User) {
-    const supabase = createClient();
+  async function ensureOrganization(currentUser: User): Promise<string | null> {
+    try {
+      const supabase = createClient();
 
-    // Check if user already has an organization
-    const { data: existingOrg } = await supabase
-      .from("organizations")
-      .select("id")
-      .eq("owner_user_id", currentUser.id)
-      .single();
+      // Check if user already has an organization
+      const { data: existingOrg, error: fetchError } = await supabase
+        .from("organizations")
+        .select("id")
+        .eq("owner_user_id", currentUser.id)
+        .maybeSingle();
 
-    if (existingOrg) {
-      setOrganizationId(existingOrg.id);
-      return;
+      if (fetchError) {
+        console.error("Error fetching organization:", fetchError);
+        return null;
+      }
+
+      if (existingOrg) {
+        return existingOrg.id;
+      }
+
+      // Create a new organization for the user
+      const userName = currentUser.user_metadata?.full_name
+        || currentUser.user_metadata?.name
+        || currentUser.email?.split("@")[0]
+        || "My Organization";
+
+      const slug = `${userName.toLowerCase().replace(/[^a-z0-9]/g, "-")}-${Date.now()}`;
+
+      const { data: newOrg, error: insertError } = await supabase
+        .from("organizations")
+        .insert({
+          name: `${userName}'s Organization`,
+          slug,
+          owner_user_id: currentUser.id,
+          subscription_tier: "free",
+          subscription_status: "active",
+        })
+        .select("id")
+        .single();
+
+      if (insertError) {
+        console.error("Error creating organization:", insertError);
+        return null;
+      }
+
+      return newOrg.id;
+    } catch (err) {
+      console.error("Unexpected error in ensureOrganization:", err);
+      return null;
     }
-
-    // Create a new organization for the user
-    const userName = currentUser.user_metadata?.full_name
-      || currentUser.user_metadata?.name
-      || currentUser.email?.split("@")[0]
-      || "My Organization";
-
-    const slug = `${userName.toLowerCase().replace(/[^a-z0-9]/g, "-")}-${Date.now()}`;
-
-    const { data: newOrg, error } = await supabase
-      .from("organizations")
-      .insert({
-        name: `${userName}'s Organization`,
-        slug,
-        owner_user_id: currentUser.id,
-        subscription_tier: "free",
-        subscription_status: "active",
-      })
-      .select("id")
-      .single();
-
-    if (error) {
-      console.error("Error creating organization:", error);
-      return;
-    }
-
-    setOrganizationId(newOrg.id);
   }
 
   useEffect(() => {
@@ -83,7 +92,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null);
 
       if (session?.user) {
-        await ensureOrganization(session.user);
+        const orgId = await ensureOrganization(session.user);
+        setOrganizationId(orgId);
       }
 
       setLoading(false);
@@ -92,6 +102,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!session?.user && !publicPaths.includes(pathname)) {
         router.push("/login");
       }
+    }).catch((err) => {
+      console.error("Error getting session:", err);
+      setLoading(false);
     });
 
     // Listen for auth changes
@@ -101,7 +114,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null);
 
       if (session?.user) {
-        await ensureOrganization(session.user);
+        const orgId = await ensureOrganization(session.user);
+        setOrganizationId(orgId);
       } else {
         setOrganizationId(null);
       }
