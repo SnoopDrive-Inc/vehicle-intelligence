@@ -85,25 +85,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    const supabase = createClient();
+    console.log("[AuthProvider] useEffect starting");
+    let supabase;
+    try {
+      supabase = createClient();
+      console.log("[AuthProvider] Supabase client created");
+    } catch (err) {
+      console.error("[AuthProvider] Failed to create Supabase client:", err);
+      setLoading(false);
+      return;
+    }
 
     // Get initial session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      console.log("[AuthProvider] Got session:", !!session?.user);
       setUser(session?.user ?? null);
 
       if (session?.user) {
         const orgId = await ensureOrganization(session.user);
+        console.log("[AuthProvider] Got org ID:", orgId);
         setOrganizationId(orgId);
       }
 
       setLoading(false);
+      console.log("[AuthProvider] Loading set to false");
 
       // Redirect if not authenticated and not on public path
       if (!session?.user && !publicPaths.includes(pathname)) {
         router.push("/login");
       }
     }).catch((err) => {
-      console.error("Error getting session:", err);
+      console.error("[AuthProvider] Error getting session:", err);
       setLoading(false);
     });
 
