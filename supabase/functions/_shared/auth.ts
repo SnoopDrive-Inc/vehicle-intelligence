@@ -1,4 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { Ratelimit } from 'https://esm.sh/@upstash/ratelimit@2';
+import { Redis } from 'https://esm.sh/@upstash/redis@1';
 
 export interface AuthResult {
   isValid: boolean;
@@ -12,9 +14,25 @@ export interface AuthResult {
   errorCode?: string;
 }
 
-// Simple in-memory rate limiter (per-worker, resets on cold start)
-// For production, use Redis/Upstash
-const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
+// Upstash Redis for distributed rate limiting
+const redis = new Redis({
+  url: Deno.env.get('UPSTASH_REDIS_REST_URL') ?? '',
+  token: Deno.env.get('UPSTASH_REDIS_REST_TOKEN') ?? '',
+});
+
+// Rate limiters by tier (cached)
+const rateLimiters = new Map<number, Ratelimit>();
+
+function getRateLimiter(requestsPerMinute: number): Ratelimit {
+  if (!rateLimiters.has(requestsPerMinute)) {
+    rateLimiters.set(requestsPerMinute, new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(requestsPerMinute, '1 m'),
+      prefix: 'carintel_ratelimit',
+    }));
+  }
+  return rateLimiters.get(requestsPerMinute)!;
+}
 
 export async function authenticateRequest(req: Request): Promise<AuthResult> {
   const authHeader = req.headers.get('Authorization');
@@ -84,26 +102,22 @@ export async function authenticateRequest(req: Request): Promise<AuthResult> {
   };
 }
 
-export function checkRateLimit(organizationId: string, limit: number): { allowed: boolean; retryAfter?: number } {
-  const now = Date.now();
-  const windowMs = 60000; // 1 minute window
-  const key = organizationId;
+export async function checkRateLimit(organizationId: string, limit: number): Promise<{ allowed: boolean; retryAfter?: number; remaining?: number }> {
+  try {
+    const rateLimiter = getRateLimiter(limit);
+    const result = await rateLimiter.limit(organizationId);
 
-  const current = rateLimitMap.get(key);
+    if (!result.success) {
+      const retryAfter = Math.ceil((result.reset - Date.now()) / 1000);
+      return { allowed: false, retryAfter: Math.max(1, retryAfter), remaining: 0 };
+    }
 
-  if (!current || (now - current.windowStart) > windowMs) {
-    // New window
-    rateLimitMap.set(key, { count: 1, windowStart: now });
+    return { allowed: true, remaining: result.remaining };
+  } catch (error) {
+    console.error('Rate limit check failed:', error);
+    // Fail open - allow request if Redis is unavailable
     return { allowed: true };
   }
-
-  if (current.count >= limit) {
-    const retryAfter = Math.ceil((windowMs - (now - current.windowStart)) / 1000);
-    return { allowed: false, retryAfter };
-  }
-
-  current.count++;
-  return { allowed: true };
 }
 
 export async function logUsage(

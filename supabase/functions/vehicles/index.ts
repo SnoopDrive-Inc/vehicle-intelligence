@@ -32,8 +32,8 @@ Deno.serve(async (req) => {
     return unauthorizedResponse(auth.error || 'Unauthorized');
   }
 
-  // Rate limit check
-  const rateLimitCheck = checkRateLimit(auth.organizationId!, auth.rateLimit!);
+  // Rate limit check (async with Redis)
+  const rateLimitCheck = await checkRateLimit(auth.organizationId!, auth.rateLimit!);
   if (!rateLimitCheck.allowed) {
     return rateLimitResponse(rateLimitCheck.retryAfter!);
   }
