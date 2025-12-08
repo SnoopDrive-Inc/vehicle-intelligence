@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase";
 
 function AuthCallbackContent() {
   const router = useRouter();
@@ -12,72 +12,52 @@ function AuthCallbackContent() {
   useEffect(() => {
     console.log("[Auth Callback] Page loaded, URL:", window.location.href);
 
-    // Create a fresh Supabase client for the callback to ensure detectSessionInUrl works
-    // Don't use the singleton - we need a fresh client that will detect the URL params
-    const supabase = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        auth: {
-          autoRefreshToken: true,
-          persistSession: true,
-          detectSessionInUrl: true,
-          flowType: "pkce",
-        },
-      }
-    );
+    const errorParam = searchParams.get("error");
+    const errorDescription = searchParams.get("error_description");
 
-    async function handleCallback() {
-      const code = searchParams.get("code");
-      const errorParam = searchParams.get("error");
-      const errorDescription = searchParams.get("error_description");
-
-      console.log("[Auth Callback] Params - code:", !!code, "error:", errorParam);
-
-      if (errorParam) {
-        setError(errorDescription || errorParam);
-        return;
-      }
-
-      if (code) {
-        // Explicitly exchange the code for a session
-        console.log("[Auth Callback] Exchanging code for session...");
-        const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-
-        if (exchangeError) {
-          console.error("[Auth Callback] Code exchange error:", exchangeError);
-          setError(exchangeError.message);
-          return;
-        }
-
-        if (data.session) {
-          console.log("[Auth Callback] Session obtained, redirecting...");
-          // Give a moment for the session to be stored
-          await new Promise(resolve => setTimeout(resolve, 100));
-          router.push("/");
-          return;
-        }
-      }
-
-      // Check if already signed in
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      console.log("[Auth Callback] Session check:", !!session, sessionError?.message);
-
-      if (session) {
-        router.push("/");
-      } else if (!code) {
-        setError("No authorization code received. Please try logging in again.");
-      }
+    if (errorParam) {
+      setError(errorDescription || errorParam);
+      return;
     }
 
-    handleCallback();
+    // Use the singleton client - it has the PKCE code verifier stored
+    // The detectSessionInUrl option will automatically exchange the code
+    const supabase = createClient();
+
+    // Listen for auth state changes - this fires when the code is exchanged
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("[Auth Callback] Auth state change:", event, !!session);
+
+      if (event === "SIGNED_IN" && session) {
+        console.log("[Auth Callback] User signed in, redirecting to home...");
+        // Use window.location for a full page reload to ensure clean state
+        window.location.href = "/";
+      }
+    });
+
+    // Also check if session already exists (in case event already fired)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log("[Auth Callback] Session check:", !!session);
+      if (session) {
+        console.log("[Auth Callback] Already have session, redirecting...");
+        window.location.href = "/";
+      }
+    });
 
     // Set a timeout to show error if nothing happens
     const timeout = setTimeout(() => {
-      setError("Authentication timed out. Please try again.");
-    }, 15000);
+      // Check one more time before showing error
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          window.location.href = "/";
+        } else {
+          setError("Authentication timed out. Please try again.");
+        }
+      });
+    }, 10000);
 
     return () => {
+      subscription.unsubscribe();
       clearTimeout(timeout);
     };
   }, [router, searchParams]);

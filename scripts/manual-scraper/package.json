@@ -1,0 +1,24 @@
+{
+  "name": "@carintel/manual-scraper",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Scraper for vehicle owner's manuals from manual-directory.com",
+  "type": "module",
+  "scripts": {
+    "scrape": "npx tsx scrape-manuals.ts",
+    "scrape:test": "npx tsx scrape-manuals.ts --limit=5",
+    "scrape:ford": "npx tsx scrape-manuals.ts --make=Ford --limit=10",
+    "scrape:download": "npx tsx scrape-manuals.ts --download",
+    "upload": "npx tsx upload-to-supabase.ts",
+    "sync": "npx tsx sync-manuals.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "dotenv": "^17.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0"
+  }
+}
