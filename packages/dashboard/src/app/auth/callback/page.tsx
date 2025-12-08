@@ -1,41 +1,76 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
-export default function AuthCallbackPage() {
+function AuthCallbackContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     console.log("[Auth Callback] Page loaded, URL:", window.location.href);
 
-    const supabase = createClient();
-
-    // Listen for auth state changes - Supabase will automatically
-    // process the code in the URL when detectSessionInUrl is true
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("[Auth Callback] Auth state change:", event, !!session);
-
-      if (event === "SIGNED_IN" && session) {
-        console.log("[Auth Callback] User signed in, redirecting...");
-        router.push("/");
-      } else if (event === "TOKEN_REFRESHED") {
-        // Token was refreshed, user is still signed in
-        console.log("[Auth Callback] Token refreshed");
+    // Create a fresh Supabase client for the callback to ensure detectSessionInUrl works
+    // Don't use the singleton - we need a fresh client that will detect the URL params
+    const supabase = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        auth: {
+          autoRefreshToken: true,
+          persistSession: true,
+          detectSessionInUrl: true,
+          flowType: "pkce",
+        },
       }
-    });
+    );
 
-    // Also check if already signed in (in case the event already fired)
-    supabase.auth.getSession().then(({ data: { session }, error: sessionError }) => {
-      console.log("[Auth Callback] Initial session check:", !!session, sessionError?.message);
+    async function handleCallback() {
+      const code = searchParams.get("code");
+      const errorParam = searchParams.get("error");
+      const errorDescription = searchParams.get("error_description");
+
+      console.log("[Auth Callback] Params - code:", !!code, "error:", errorParam);
+
+      if (errorParam) {
+        setError(errorDescription || errorParam);
+        return;
+      }
+
+      if (code) {
+        // Explicitly exchange the code for a session
+        console.log("[Auth Callback] Exchanging code for session...");
+        const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+
+        if (exchangeError) {
+          console.error("[Auth Callback] Code exchange error:", exchangeError);
+          setError(exchangeError.message);
+          return;
+        }
+
+        if (data.session) {
+          console.log("[Auth Callback] Session obtained, redirecting...");
+          // Give a moment for the session to be stored
+          await new Promise(resolve => setTimeout(resolve, 100));
+          router.push("/");
+          return;
+        }
+      }
+
+      // Check if already signed in
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      console.log("[Auth Callback] Session check:", !!session, sessionError?.message);
+
       if (session) {
         router.push("/");
-      } else if (sessionError) {
-        setError(sessionError.message);
+      } else if (!code) {
+        setError("No authorization code received. Please try logging in again.");
       }
-    });
+    }
+
+    handleCallback();
 
     // Set a timeout to show error if nothing happens
     const timeout = setTimeout(() => {
@@ -43,10 +78,9 @@ export default function AuthCallbackPage() {
     }, 15000);
 
     return () => {
-      subscription.unsubscribe();
       clearTimeout(timeout);
     };
-  }, [router]);
+  }, [router, searchParams]);
 
   if (error) {
     return (
@@ -72,5 +106,22 @@ export default function AuthCallbackPage() {
         <p className="text-gray-400">Completing sign in...</p>
       </div>
     </div>
+  );
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
+            <p className="text-gray-400">Loading...</p>
+          </div>
+        </div>
+      }
+    >
+      <AuthCallbackContent />
+    </Suspense>
   );
 }
