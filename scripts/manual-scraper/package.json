@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
-    "dotenv": "^17.2.3"
+    "dotenv": "^17.2.3",
+    "pdfjs-dist": "^5.4.449"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

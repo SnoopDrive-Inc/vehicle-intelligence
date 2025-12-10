@@ -49,127 +49,23 @@ const MODEL_URL_MAPPING: Record<string, { make: string; model: string }> = {
   'mercedes-benz|gle': { make: 'mercedes', model: 'gle' },
 };
 
-// Top 100 most popular vehicles (based on US market data and our database coverage)
+// All manufacturers from manual-directory.com in order
+const ALL_MANUFACTURERS = [
+  'Acura', 'Alfa Romeo', 'Audi', 'BMW', 'Buick', 'Cadillac', 'Chevrolet',
+  'Chrysler', 'Dodge', 'Fiat', 'Ford', 'GMC', 'Honda', 'Hyundai', 'Infiniti',
+  'Jaguar', 'Jeep', 'Kia', 'Land Rover', 'Lexus', 'Lincoln', 'Maserati',
+  'Mazda', 'Mercedes', 'Mercury', 'Mini', 'Mitsubishi', 'Nissan', 'Polestar',
+  'Pontiac', 'Porsche', 'Rivian', 'Saab', 'Smart', 'Subaru', 'Suzuki',
+  'Tesla', 'Toyota', 'Volkswagen', 'Volvo'
+];
+
+// Legacy list for --legacy mode
 const TOP_100_VEHICLES = [
-  // Trucks
   { make: 'Ford', model: 'F-150' },
-  { make: 'Chevrolet', model: 'Silverado 1500' },
-  { make: 'RAM', model: '1500' },
-  { make: 'GMC', model: 'Sierra 1500' },
-  { make: 'Toyota', model: 'Tacoma' },
-  { make: 'Ford', model: 'F-250' },
-  { make: 'Ford', model: 'F-350' },
-  { make: 'Chevrolet', model: 'Colorado' },
-  { make: 'Ford', model: 'Ranger' },
-  { make: 'Nissan', model: 'Titan' },
-
-  // SUVs - Compact
-  { make: 'Toyota', model: 'RAV4' },
-  { make: 'Honda', model: 'CR-V' },
-  { make: 'Nissan', model: 'Rogue' },
-  { make: 'Ford', model: 'Escape' },
-  { make: 'Chevrolet', model: 'Equinox' },
-  { make: 'Jeep', model: 'Grand Cherokee' },
-  { make: 'Jeep', model: 'Wrangler' },
-  { make: 'Jeep', model: 'Cherokee' },
-  { make: 'Mazda', model: 'CX-5' },
-  { make: 'Subaru', model: 'Outback' },
-  { make: 'Subaru', model: 'Forester' },
-  { make: 'Hyundai', model: 'Tucson' },
-  { make: 'Kia', model: 'Sportage' },
-  { make: 'GMC', model: 'Terrain' },
-  { make: 'Volkswagen', model: 'Tiguan' },
-
-  // SUVs - Mid/Full Size
-  { make: 'Ford', model: 'Explorer' },
-  { make: 'Chevrolet', model: 'Tahoe' },
-  { make: 'Chevrolet', model: 'Traverse' },
-  { make: 'Toyota', model: 'Highlander' },
-  { make: 'Toyota', model: '4Runner' },
-  { make: 'Honda', model: 'Pilot' },
-  { make: 'GMC', model: 'Yukon' },
-  { make: 'Ford', model: 'Expedition' },
-  { make: 'Chevrolet', model: 'Suburban' },
-  { make: 'Dodge', model: 'Durango' },
-  { make: 'Nissan', model: 'Pathfinder' },
-  { make: 'Hyundai', model: 'Santa Fe' },
-  { make: 'Kia', model: 'Sorento' },
-  { make: 'Mazda', model: 'CX-9' },
-  { make: 'Subaru', model: 'Ascent' },
-
-  // Sedans
+  { make: 'Chevrolet', model: 'Silverado' },
   { make: 'Toyota', model: 'Camry' },
   { make: 'Honda', model: 'Civic' },
-  { make: 'Honda', model: 'Accord' },
-  { make: 'Toyota', model: 'Corolla' },
-  { make: 'Nissan', model: 'Altima' },
-  { make: 'Hyundai', model: 'Sonata' },
-  { make: 'Hyundai', model: 'Elantra' },
-  { make: 'Kia', model: 'Optima' },
-  { make: 'Kia', model: 'K5' },
-  { make: 'Mazda', model: 'Mazda3' },
-  { make: 'Mazda', model: 'Mazda6' },
-  { make: 'Subaru', model: 'Impreza' },
-  { make: 'Subaru', model: 'Legacy' },
-  { make: 'Volkswagen', model: 'Jetta' },
-  { make: 'Volkswagen', model: 'Passat' },
-  { make: 'Nissan', model: 'Sentra' },
-  { make: 'Nissan', model: 'Maxima' },
-  { make: 'Ford', model: 'Fusion' },
-  { make: 'Chevrolet', model: 'Malibu' },
-  { make: 'Chevrolet', model: 'Cruze' },
-
-  // Luxury
-  { make: 'BMW', model: '3 Series' },
-  { make: 'BMW', model: '5 Series' },
-  { make: 'BMW', model: 'X3' },
-  { make: 'BMW', model: 'X5' },
-  { make: 'Mercedes-Benz', model: 'C-Class' },
-  { make: 'Mercedes-Benz', model: 'E-Class' },
-  { make: 'Mercedes-Benz', model: 'GLC' },
-  { make: 'Mercedes-Benz', model: 'GLE' },
-  { make: 'Audi', model: 'A4' },
-  { make: 'Audi', model: 'Q5' },
-  { make: 'Lexus', model: 'RX' },
-  { make: 'Lexus', model: 'ES' },
-  { make: 'Lexus', model: 'NX' },
-  { make: 'Acura', model: 'MDX' },
-  { make: 'Acura', model: 'RDX' },
-  { make: 'Infiniti', model: 'QX60' },
-  { make: 'Cadillac', model: 'Escalade' },
-  { make: 'Lincoln', model: 'Navigator' },
-  { make: 'Volvo', model: 'XC90' },
-  { make: 'Volvo', model: 'XC60' },
-
-  // Minivans
-  { make: 'Honda', model: 'Odyssey' },
-  { make: 'Toyota', model: 'Sienna' },
-  { make: 'Chrysler', model: 'Pacifica' },
-  { make: 'Dodge', model: 'Grand Caravan' },
-  { make: 'Kia', model: 'Carnival' },
-
-  // Sports/Muscle
-  { make: 'Ford', model: 'Mustang' },
-  { make: 'Chevrolet', model: 'Camaro' },
-  { make: 'Dodge', model: 'Challenger' },
-  { make: 'Dodge', model: 'Charger' },
-  { make: 'Chevrolet', model: 'Corvette' },
-
-  // Electric/Hybrid
-  { make: 'Tesla', model: 'Model 3' },
-  { make: 'Tesla', model: 'Model Y' },
-  { make: 'Tesla', model: 'Model S' },
-  { make: 'Tesla', model: 'Model X' },
-  { make: 'Toyota', model: 'Prius' },
-  { make: 'Chevrolet', model: 'Bolt' },
-  { make: 'Ford', model: 'Mach-E' },
-  { make: 'Hyundai', model: 'Ioniq' },
-
-  // Compact Cars
-  { make: 'Honda', model: 'Fit' },
-  { make: 'Toyota', model: 'Yaris' },
-  { make: 'Kia', model: 'Soul' },
-  { make: 'Hyundai', model: 'Kona' },
+  { make: 'Toyota', model: 'RAV4' },
 ];
 
 // Years to scrape (2000 and newer)
@@ -264,6 +160,37 @@ function getUrlMakeModel(make: string, model: string): { makeSlug: string; model
 }
 
 /**
+ * Get all models for a manufacturer from manual-directory.com
+ */
+async function getModelsForMake(make: string): Promise<string[]> {
+  const makeSlug = toUrlSlug(make);
+  const url = `https://manual-directory.com/cars/${makeSlug}/`;
+
+  const html = await fetchWithRetry(url);
+  if (!html) return [];
+
+  const models: string[] = [];
+
+  // Match model links like: href="https://manual-directory.com/cars/ford/f-150/"
+  const linkRegex = new RegExp(`href="https://manual-directory\\.com/cars/${makeSlug}/([^/"]+)/"`, 'g');
+  let match;
+
+  while ((match = linkRegex.exec(html)) !== null) {
+    const modelSlug = match[1];
+    // Convert slug back to display name (e.g., "f-150" -> "F-150")
+    const modelName = modelSlug.split('-').map(word =>
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join('-');
+
+    if (!models.includes(modelName)) {
+      models.push(modelName);
+    }
+  }
+
+  return models;
+}
+
+/**
  * Extract manual IDs from model listing page
  */
 async function getManualListingsForModel(make: string, model: string): Promise<Array<{ year: number; slug: string; variant?: string }>> {
@@ -353,6 +280,97 @@ async function getPdfFileSize(pdfUrl: string): Promise<number | null> {
   }
 }
 
+// Global Supabase client for immediate uploads
+let supabaseClient: any = null;
+let downloadModeEnabled = false;
+let syncModeEnabled = false;
+
+async function initSupabase() {
+  if (!supabaseClient && process.env.SUPABASE_SERVICE_KEY) {
+    const { createClient } = await import('@supabase/supabase-js');
+    supabaseClient = createClient(SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY, {
+      auth: { persistSession: false }
+    });
+  }
+  return supabaseClient;
+}
+
+/**
+ * Download, upload, and sync a single manual immediately
+ */
+async function processManualImmediately(manual: ManualInfo): Promise<boolean> {
+  const fs = await import('fs/promises');
+  await fs.mkdir(DOWNLOAD_DIR, { recursive: true });
+
+  const filename = `${manual.year}-${toUrlSlug(manual.make)}-${toUrlSlug(manual.model)}${manual.variant ? '-' + toUrlSlug(manual.variant) : ''}.pdf`;
+  const outputPath = `${DOWNLOAD_DIR}/${filename}`;
+  const storagePath = `${toUrlSlug(manual.make)}/${toUrlSlug(manual.model)}/${filename}`;
+
+  // Download
+  const downloaded = await downloadPdf(manual.pdfUrl, outputPath);
+  if (!downloaded) {
+    console.log(`      ❌ Download failed`);
+    return false;
+  }
+
+  // Upload to Supabase Storage
+  const supabase = await initSupabase();
+  if (supabase) {
+    try {
+      const fileBuffer = await fs.readFile(outputPath);
+      const { error: uploadError } = await supabase.storage
+        .from('vehicle_manuals')
+        .upload(storagePath, fileBuffer, {
+          contentType: 'application/pdf',
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.log(`      ⚠️ Upload failed: ${uploadError.message}`);
+      } else {
+        (manual as any).storagePath = storagePath;
+        console.log(`      📤 Uploaded`);
+      }
+    } catch (err: any) {
+      console.log(`      ⚠️ Upload error: ${err.message}`);
+    }
+
+    // Sync to database
+    if (syncModeEnabled) {
+      const record = {
+        year: manual.year,
+        make: manual.make,
+        model: manual.model,
+        variant: manual.variant || null,
+        source_url: manual.manualUrl,
+        source_mid: manual.mid,
+        pdf_url: manual.pdfUrl,
+        pdf_size_bytes: manual.fileSize || null,
+        pdf_year: manual.pdfYear || null,
+        year_mismatch: manual.yearMismatch || false,
+        pdf_storage_path: (manual as any).storagePath || null,
+        status: (manual as any).storagePath ? 'uploaded' : 'discovered',
+        last_verified_at: new Date().toISOString()
+      };
+
+      const { error: dbError } = await supabase
+        .from('vehicle_manuals')
+        .upsert(record, {
+          onConflict: 'year,make,model,variant',
+          ignoreDuplicates: false
+        });
+
+      if (dbError) {
+        console.log(`      ⚠️ DB sync failed: ${dbError.message}`);
+      } else {
+        console.log(`      💾 Synced to DB`);
+      }
+    }
+  }
+
+  return true;
+}
+
 /**
  * Scrape manuals for a single vehicle
  */
@@ -409,7 +427,7 @@ async function scrapeVehicle(make: string, model: string): Promise<ScrapeResult>
     const pdfYear = pdfYearMatch ? parseInt(pdfYearMatch[1]) : undefined;
     const yearMismatch = pdfYear !== undefined && pdfYear !== listing.year;
 
-    result.manuals.push({
+    const manual: ManualInfo = {
       year: listing.year,
       make,
       model,
@@ -420,10 +438,17 @@ async function scrapeVehicle(make: string, model: string): Promise<ScrapeResult>
       fileSize: fileSize || undefined,
       pdfYear,
       yearMismatch
-    });
+    };
+
+    result.manuals.push(manual);
 
     const mismatchWarning = yearMismatch ? ` ⚠️ PDF is from ${pdfYear}` : '';
-    console.log(`   ✅ ${listing.year}: ${pdfFilename} (${fileSize ? `${(fileSize / 1024 / 1024).toFixed(1)}MB` : 'unknown size'})${mismatchWarning}`);
+    console.log(`      ✅ Found: ${pdfFilename} (${fileSize ? `${(fileSize / 1024 / 1024).toFixed(1)}MB` : '?'})${mismatchWarning}`);
+
+    // Immediately download, upload, and sync if in download mode
+    if (downloadModeEnabled) {
+      await processManualImmediately(manual);
+    }
   }
 
   return result;
@@ -459,35 +484,56 @@ async function main() {
 
   // Parse command line args
   const args = process.argv.slice(2);
-  const downloadMode = args.includes('--download');
-  const syncMode = args.includes('--sync');
-  const limitArg = args.find(a => a.startsWith('--limit='));
-  const limit = limitArg ? parseInt(limitArg.split('=')[1]) : TOP_100_VEHICLES.length;
+  downloadModeEnabled = args.includes('--download');
+  syncModeEnabled = args.includes('--sync');
   const makeArg = args.find(a => a.startsWith('--make='));
   const filterMake = makeArg ? makeArg.split('=')[1] : null;
+  const skipMakesArg = args.find(a => a.startsWith('--skip-makes='));
+  const skipMakes = skipMakesArg ? skipMakesArg.split('=')[1].split(',').map(m => m.toLowerCase()) : [];
 
-  let vehicles = TOP_100_VEHICLES.slice(0, limit);
-  if (filterMake) {
-    vehicles = vehicles.filter(v => v.make.toLowerCase() === filterMake.toLowerCase());
-  }
-
-  console.log(`📊 Processing ${vehicles.length} vehicles`);
   console.log(`📅 Years: ${MIN_YEAR} - ${MAX_YEAR}`);
   console.log(`⏱️  Delay between requests: ${DELAY_BETWEEN_REQUESTS}ms`);
-  if (downloadMode) {
-    console.log(`📥 Download mode enabled - saving to ${DOWNLOAD_DIR}`);
+  if (downloadModeEnabled) {
+    console.log(`📥 Download mode enabled - immediate upload to Supabase`);
   }
-  if (syncMode) {
-    console.log(`🔄 Sync mode enabled - will save to database`);
+  if (syncModeEnabled) {
+    console.log(`🔄 Sync mode enabled - immediate database sync`);
   }
 
-  // Scrape each vehicle
-  for (const vehicle of vehicles) {
-    const result = await scrapeVehicle(vehicle.make, vehicle.model);
-    allResults.push(result);
-    allManuals.push(...result.manuals);
+  // Determine which manufacturers to process
+  let manufacturers = filterMake ? [filterMake] : ALL_MANUFACTURERS;
+  if (skipMakes.length > 0) {
+    manufacturers = manufacturers.filter(m => !skipMakes.includes(m.toLowerCase()));
+  }
 
-    // Add delay between vehicles
+  console.log(`\n🏭 Processing ${manufacturers.length} manufacturers\n`);
+
+  // Process each manufacturer
+  for (const make of manufacturers) {
+    console.log(`\n${'='.repeat(50)}`);
+    console.log(`🏭 ${make.toUpperCase()}`);
+    console.log('='.repeat(50));
+
+    // Get all models for this manufacturer
+    const models = await getModelsForMake(make);
+    if (models.length === 0) {
+      console.log(`   ❌ No models found for ${make}`);
+      continue;
+    }
+
+    console.log(`   📋 Found ${models.length} models: ${models.slice(0, 5).join(', ')}${models.length > 5 ? '...' : ''}`);
+
+    // Scrape each model
+    for (const model of models) {
+      const result = await scrapeVehicle(make, model);
+      allResults.push(result);
+      allManuals.push(...result.manuals);
+
+      // Add delay between models
+      await delay(DELAY_BETWEEN_REQUESTS);
+    }
+
+    // Add delay between manufacturers
     await delay(DELAY_BETWEEN_REQUESTS * 2);
   }
 
@@ -522,91 +568,18 @@ async function main() {
   await fs.writeFile('manual-scrape-results.json', JSON.stringify(outputData, null, 2));
   console.log('\n💾 Results saved to manual-scrape-results.json');
 
-  // Download and upload PDFs if requested
-  if (downloadMode && allManuals.length > 0) {
-    const serviceKey = process.env.SUPABASE_SERVICE_KEY;
-    const shouldUpload = !!serviceKey;
-
-    console.log('\n📥 Starting PDF downloads...');
-    if (shouldUpload) {
-      console.log('📤 Will upload to Supabase Storage');
-    }
-    await fs.mkdir(DOWNLOAD_DIR, { recursive: true });
-
-    // Initialize Supabase client for uploads
-    let supabase: any = null;
-    if (shouldUpload) {
-      const { createClient } = await import('@supabase/supabase-js');
-      supabase = createClient(SUPABASE_URL, serviceKey, { auth: { persistSession: false } });
-    }
-
-    let downloaded = 0;
-    let uploaded = 0;
-    for (const manual of allManuals) {
-      // Local filename for download
-      const filename = `${manual.year}-${toUrlSlug(manual.make)}-${toUrlSlug(manual.model)}${manual.variant ? '-' + manual.variant : ''}.pdf`;
-      const outputPath = `${DOWNLOAD_DIR}/${filename}`;
-
-      // Storage path: {make}/{model}/{year}-{make}-{model}[-variant].pdf
-      const storagePath = `${toUrlSlug(manual.make)}/${toUrlSlug(manual.model)}/${filename}`;
-
-      console.log(`   Downloading ${filename}...`);
-      const success = await downloadPdf(manual.pdfUrl, outputPath);
-      if (success) {
-        downloaded++;
-        console.log(`   ✅ Downloaded (${downloaded}/${allManuals.length})`);
-
-        // Upload to Supabase Storage
-        if (shouldUpload && supabase) {
-          try {
-            const fileBuffer = await fs.readFile(outputPath);
-            const { error: uploadError } = await supabase.storage
-              .from('vehicle_manuals')
-              .upload(storagePath, fileBuffer, {
-                contentType: 'application/pdf',
-                upsert: true
-              });
-
-            if (uploadError) {
-              console.error(`   ⚠️  Upload failed: ${uploadError.message}`);
-            } else {
-              uploaded++;
-              // Store the storage path in the manual object for sync
-              (manual as any).storagePath = storagePath;
-              console.log(`   📤 Uploaded to ${storagePath}`);
-            }
-          } catch (err) {
-            console.error(`   ⚠️  Upload error:`, err);
-          }
-        }
-      }
-
-      await delay(DELAY_BETWEEN_REQUESTS);
-    }
-
-    console.log(`\n✅ Downloaded ${downloaded}/${allManuals.length} PDFs to ${DOWNLOAD_DIR}`);
-    if (shouldUpload) {
-      console.log(`📤 Uploaded ${uploaded}/${downloaded} to Supabase Storage`);
-    }
+  // Count uploads and syncs
+  const uploaded = allManuals.filter(m => (m as any).storagePath).length;
+  if (downloadModeEnabled) {
+    console.log(`\n📤 Uploaded ${uploaded}/${allManuals.length} PDFs to Supabase Storage`);
+  }
+  if (syncModeEnabled) {
+    console.log(`💾 Synced ${uploaded} manuals to database`);
   }
 
-  // Sync to database if requested
-  if (syncMode && allManuals.length > 0) {
-    const { syncToDatabase } = await import('./sync-manuals.js');
-    const serviceKey = process.env.SUPABASE_SERVICE_KEY;
-    if (!serviceKey) {
-      console.error('\n❌ SUPABASE_SERVICE_KEY required for --sync mode');
-      console.error('   Set it with: export SUPABASE_SERVICE_KEY="your-service-role-key"');
-    } else {
-      console.log('\n');
-      const { inserted, errors } = await syncToDatabase(outputData, serviceKey);
-      console.log(`\n✅ Synced ${inserted} manuals to database (${errors} errors)`);
-
-      const mismatches = allManuals.filter(m => m.yearMismatch).length;
-      if (mismatches > 0) {
-        console.log(`⚠️  ${mismatches} manuals have year mismatches (placeholder PDFs)`);
-      }
-    }
+  const mismatches = allManuals.filter(m => m.yearMismatch).length;
+  if (mismatches > 0) {
+    console.log(`⚠️  ${mismatches} manuals have year mismatches (placeholder PDFs)`);
   }
 }
 
