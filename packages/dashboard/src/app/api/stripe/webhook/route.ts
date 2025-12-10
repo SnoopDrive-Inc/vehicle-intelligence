@@ -1,14 +1,8 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { getStripe, getTierIdFromPriceId } from "@/lib/stripe";
 import Stripe from "stripe";
-
-// Create a Supabase client with service role for server-side operations
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 const relevantEvents = new Set([
   "checkout.session.completed",
@@ -50,6 +44,8 @@ export async function POST(request: Request) {
   if (!relevantEvents.has(event.type)) {
     return NextResponse.json({ received: true });
   }
+
+  const supabaseAdmin = getSupabaseAdmin();
 
   try {
     switch (event.type) {
