@@ -6,7 +6,6 @@ import { useAuth } from "@/components/AuthProvider";
 import { toast } from "sonner";
 import {
   Building2,
-  ChevronDown,
   CreditCard,
   Globe,
   MoreHorizontal,
@@ -104,16 +103,8 @@ interface EmailDomain {
   created_at: string;
 }
 
-interface UserOrg {
-  org: Organization;
-  tier: Tier | null;
-  role: "owner" | "admin" | "member";
-}
-
 export default function SettingsPage() {
-  const { user } = useAuth();
-  const [userOrgs, setUserOrgs] = useState<UserOrg[]>([]);
-  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
+  const { user, organizationId, currentOrganization } = useAuth();
   const [org, setOrg] = useState<Organization | null>(null);
   const [tier, setTier] = useState<Tier | null>(null);
   const [userRole, setUserRole] = useState<"owner" | "admin" | "member">("member");
@@ -133,105 +124,58 @@ export default function SettingsPage() {
   const [newDomain, setNewDomain] = useState("");
   const [addingDomain, setAddingDomain] = useState(false);
 
+  // Load organization details when organizationId changes
   useEffect(() => {
-    loadOrganizations();
-  }, []);
-
-  useEffect(() => {
-    if (selectedOrgId && userOrgs.length > 0) {
-      loadOrgDetails(selectedOrgId);
-    }
-  }, [selectedOrgId, userOrgs]);
-
-  async function loadOrganizations() {
-    const supabase = createClient();
-    const {
-      data: { user: currentUser },
-    } = await supabase.auth.getUser();
-
-    if (!currentUser) {
-      setLoading(false);
-      return;
-    }
-
-    const allOrgs: UserOrg[] = [];
-
-    // Fetch organizations the user owns
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: ownedOrgs } = await (supabase.from("organizations") as any)
-      .select("*, subscription_tiers(*)")
-      .eq("owner_user_id", currentUser.id);
-
-    if (ownedOrgs) {
-      for (const orgData of ownedOrgs) {
-        allOrgs.push({
-          org: orgData as Organization,
-          tier: orgData.subscription_tiers as Tier | null,
-          role: "owner",
-        });
-      }
-    }
-
-    // Fetch organizations the user is a member of (but not owner)
-    const { data: memberships } = await supabase
-      .from("organization_members")
-      .select("organization_id, role")
-      .eq("user_id", currentUser.id);
-
-    if (memberships && memberships.length > 0) {
-      const memberOrgIds = memberships
-        .map((m) => m.organization_id)
-        .filter((id) => !allOrgs.some((o) => o.org.id === id));
-
-      if (memberOrgIds.length > 0) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: memberOrgs } = await (supabase.from("organizations") as any)
-          .select("*, subscription_tiers(*)")
-          .in("id", memberOrgIds);
-
-        if (memberOrgs) {
-          for (const orgData of memberOrgs) {
-            const membership = memberships.find((m) => m.organization_id === orgData.id);
-            allOrgs.push({
-              org: orgData as Organization,
-              tier: orgData.subscription_tiers as Tier | null,
-              role: membership?.role === "admin" ? "admin" : "member",
-            });
-          }
-        }
-      }
-    }
-
-    setUserOrgs(allOrgs);
-
-    // Select the first org by default, or the one from localStorage
-    if (allOrgs.length > 0) {
-      const savedOrgId = localStorage.getItem("selectedOrgId");
-      const savedOrg = savedOrgId ? allOrgs.find((o) => o.org.id === savedOrgId) : null;
-      const defaultOrg = savedOrg || allOrgs[0];
-      setSelectedOrgId(defaultOrg.org.id);
+    if (organizationId) {
+      loadOrgDetails(organizationId);
     } else {
       setLoading(false);
     }
-  }
+  }, [organizationId]);
 
   async function loadOrgDetails(orgId: string) {
     setLoading(true);
     const supabase = createClient();
 
-    const userOrg = userOrgs.find((o) => o.org.id === orgId);
-    if (!userOrg) {
+    // Fetch organization with tier
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: orgData, error: orgError } = await (supabase.from("organizations") as any)
+      .select("*, subscription_tiers(*)")
+      .eq("id", orgId)
+      .single();
+
+    if (orgError || !orgData) {
+      console.error("Error fetching organization:", orgError);
       setLoading(false);
       return;
     }
 
-    setOrg(userOrg.org);
-    setOrgName(userOrg.org.name);
-    setTier(userOrg.tier);
-    setUserRole(userOrg.role);
+    const fetchedOrg = orgData as Organization & { subscription_tiers: Tier | null };
+    setOrg(fetchedOrg);
+    setOrgName(fetchedOrg.name);
+    setTier(fetchedOrg.subscription_tiers);
 
-    // Save selection to localStorage
-    localStorage.setItem("selectedOrgId", orgId);
+    // Determine user's role
+    const currentUserId = user?.id;
+    if (fetchedOrg.owner_user_id === currentUserId) {
+      setUserRole("owner");
+    } else {
+      // Check if user is a member
+      const { data: membership } = await supabase
+        .from("organization_members")
+        .select("role")
+        .eq("organization_id", orgId)
+        .eq("user_id", currentUserId)
+        .single();
+
+      if (membership) {
+        setUserRole(membership.role === "admin" ? "admin" : "member");
+      } else {
+        setUserRole("member");
+      }
+    }
+
+    const currentUserRole = fetchedOrg.owner_user_id === currentUserId ? "owner" : userRole;
 
     // Fetch members
     const { data: membersData } = await supabase
@@ -259,7 +203,8 @@ export default function SettingsPage() {
     }
 
     // Fetch invites (only if user is owner or admin)
-    if (userOrg.role === "owner" || userOrg.role === "admin") {
+    const canFetchSensitive = currentUserRole === "owner" || currentUserRole === "admin";
+    if (canFetchSensitive) {
       const { data: invitesData } = await supabase
         .from("user_invites")
         .select("id, email, role, expires_at, accepted_at")
@@ -312,12 +257,7 @@ export default function SettingsPage() {
       .update({ name: orgName })
       .eq("id", org.id);
 
-    // Update the org in userOrgs array
-    setUserOrgs((prev) =>
-      prev.map((o) =>
-        o.org.id === org.id ? { ...o, org: { ...o.org, name: orgName } } : o
-      )
-    );
+    // Update local state
     setOrg((prev) => (prev ? { ...prev, name: orgName } : prev));
 
     setSaving(false);
@@ -325,8 +265,8 @@ export default function SettingsPage() {
   }
 
   function reloadCurrentOrg() {
-    if (selectedOrgId) {
-      loadOrgDetails(selectedOrgId);
+    if (organizationId) {
+      loadOrgDetails(organizationId);
     }
   }
 
@@ -469,7 +409,7 @@ export default function SettingsPage() {
     );
   }
 
-  if (!org || userOrgs.length === 0) {
+  if (!org) {
     return (
       <div className="space-y-6">
         <div className="space-y-1">
@@ -499,47 +439,11 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-          <p className="text-muted-foreground">
-            Manage your organization settings and team members
-          </p>
-        </div>
-
-        {/* Organization Selector */}
-        {userOrgs.length > 1 && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2">
-                <Building2 className="h-4 w-4" />
-                <span className="max-w-[200px] truncate">{org.name}</span>
-                <Badge variant="secondary" className="ml-1 text-xs">
-                  {userRole}
-                </Badge>
-                <ChevronDown className="h-4 w-4 ml-1" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-[280px]">
-              <DropdownMenuLabel>Switch Organization</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {userOrgs.map((userOrg) => (
-                <DropdownMenuItem
-                  key={userOrg.org.id}
-                  onClick={() => setSelectedOrgId(userOrg.org.id)}
-                  className={selectedOrgId === userOrg.org.id ? "bg-muted" : ""}
-                >
-                  <div className="flex items-center justify-between w-full">
-                    <span className="truncate">{userOrg.org.name}</span>
-                    <Badge variant="outline" className="ml-2 text-xs">
-                      {userOrg.role}
-                    </Badge>
-                  </div>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+      <div className="space-y-1">
+        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+        <p className="text-muted-foreground">
+          Manage your organization settings and team members
+        </p>
       </div>
 
       <Tabs defaultValue="organization" className="space-y-4">

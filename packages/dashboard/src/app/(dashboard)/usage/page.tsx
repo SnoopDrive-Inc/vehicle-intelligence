@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
+import { useAuth } from "@/components/AuthProvider";
 import {
   LineChart,
   Line,
@@ -29,38 +30,25 @@ interface DailyUsage {
 }
 
 export default function UsagePage() {
+  const { organizationId } = useAuth();
   const [recentLogs, setRecentLogs] = useState<UsageLog[]>([]);
   const [dailyUsage, setDailyUsage] = useState<DailyUsage[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadUsage() {
+      if (!organizationId) {
+        setLoading(false);
+        return;
+      }
+
       const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: org } = await (supabase.from("organizations") as any)
-        .select("id")
-        .eq("owner_user_id", user.id)
-        .single();
-
-      if (!org) {
-        setLoading(false);
-        return;
-      }
 
       // Get recent logs
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: logs } = await (supabase.from("usage_logs") as any)
         .select("id, endpoint, method, source, response_status, latency_ms, created_at")
-        .eq("organization_id", (org as { id: string }).id)
+        .eq("organization_id", organizationId)
         .order("created_at", { ascending: false })
         .limit(100);
 
@@ -73,7 +61,7 @@ export default function UsagePage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: daily } = await (supabase.from("usage_daily") as any)
         .select("date, request_count, endpoint")
-        .eq("organization_id", (org as { id: string }).id)
+        .eq("organization_id", organizationId)
         .gte("date", thirtyDaysAgo.toISOString().split("T")[0])
         .order("date", { ascending: true });
 
@@ -82,7 +70,7 @@ export default function UsagePage() {
     }
 
     loadUsage();
-  }, []);
+  }, [organizationId]);
 
   // Aggregate daily usage for chart
   const chartData = dailyUsage.reduce((acc, item) => {

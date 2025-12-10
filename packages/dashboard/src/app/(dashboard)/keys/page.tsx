@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
+import { useAuth } from "@/components/AuthProvider";
 import { toast } from "sonner";
 import {
   Copy,
@@ -60,6 +61,7 @@ interface ApiKey {
 }
 
 export default function KeysPage() {
+  const { organizationId } = useAuth();
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -70,35 +72,22 @@ export default function KeysPage() {
   const [keyDialogOpen, setKeyDialogOpen] = useState(false);
 
   useEffect(() => {
-    loadKeys();
-  }, []);
+    if (organizationId) {
+      loadKeys();
+    }
+  }, [organizationId]);
 
   async function loadKeys() {
+    if (!organizationId) {
+      setLoading(false);
+      return;
+    }
+
     const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    const { data: org } = await supabase
-      .from("organizations")
-      .select("id")
-      .eq("owner_user_id", user.id)
-      .single();
-
-    if (!org) {
-      setLoading(false);
-      return;
-    }
-
     const { data } = await supabase
       .from("api_keys")
       .select("id, name, key_prefix, environment, is_active, created_at, last_used_at")
-      .eq("organization_id", (org as { id: string }).id)
+      .eq("organization_id", organizationId)
       .order("created_at", { ascending: false });
 
     setKeys((data as ApiKey[]) || []);
@@ -106,18 +95,10 @@ export default function KeysPage() {
   }
 
   async function createKey() {
-    if (!newKeyName.trim()) return;
+    if (!newKeyName.trim() || !organizationId) return;
 
     setCreating(true);
     const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      setCreating(false);
-      return;
-    }
 
     const prefix = `ci_${newKeyEnv}_`;
     const randomPart = Array.from(crypto.getRandomValues(new Uint8Array(24)))
@@ -131,20 +112,9 @@ export default function KeysPage() {
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const keyHash = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 
-    const { data: org } = await supabase
-      .from("organizations")
-      .select("id")
-      .eq("owner_user_id", user.id)
-      .single();
-
-    if (!org) {
-      setCreating(false);
-      return;
-    }
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase.from("api_keys") as any).insert({
-      organization_id: (org as { id: string }).id,
+      organization_id: organizationId,
       name: newKeyName,
       key_hash: keyHash,
       key_prefix: fullKey.slice(0, 12) + "...",
