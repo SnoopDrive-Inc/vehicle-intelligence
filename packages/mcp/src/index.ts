@@ -5,9 +5,9 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 // Configuration
-const API_BASE_URL = process.env.CARINTEL_API_URL || "https://jxpbnnmefwtazfvoxvge.supabase.co/functions/v1/vehicles";
+const API_BASE_URL = process.env.CARINTEL_API_URL || "https://api.carintel.io/v1";
 const API_KEY = process.env.CARINTEL_API_KEY;
-const SUPABASE_URL = process.env.SUPABASE_URL || "https://jxpbnnmefwtazfvoxvge.supabase.co";
+const SUPABASE_URL = process.env.SUPABASE_URL || "https://api.carintel.io";
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
 if (!API_KEY) {

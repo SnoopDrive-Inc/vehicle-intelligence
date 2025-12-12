@@ -36,7 +36,7 @@ info:
     Each API request consumes 1 token. Your remaining quota is returned in the `meta.tokens_remaining` field.
 
 servers:
-  - url: https://jxpbnnmefwtazfvoxvge.supabase.co/functions/v1/vehicles
+  - url: https://api.carintel.io/v1
     description: Production server
 
 tags:
